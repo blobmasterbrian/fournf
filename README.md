@@ -22,13 +22,13 @@ import (
 
     "entgo.io/ent/entc"
     "entgo.io/ent/entc/gen"
-    "github.com/blobmasterbrian/fournf/extension"
+    "github.com/blobmasterbrian/fournf"
 )
 
 func main() {
     err := entc.Generate("./schema",
         &gen.Config{},
-        entc.Extensions(extension.FourNF),
+        entc.Extensions(fournf.Extension{}),
     )
     if err != nil {
         log.Fatalf("running ent codegen: %v", err)
@@ -41,7 +41,7 @@ func main() {
 ### 2. Define entity schemas and join table schemas
 
 Entity schemas define your domain models. Join table schemas wire relationships
-between them and are annotated with `annotation.JoinTable`.
+between them and are annotated with `annotation.JoinTable{}`.
 
 ```go
 // schema/species.go
@@ -93,7 +93,7 @@ type SpeciesHabitat struct { ent.Schema }
 
 func (SpeciesHabitat) Annotations() []schema.Annotation {
     return []schema.Annotation{
-        annotation.JoinTable,
+        annotation.JoinTable{},
     }
 }
 
@@ -160,7 +160,7 @@ package schema
 type SpeciesHabitat struct { ent.Schema }
 
 func (SpeciesHabitat) Annotations() []schema.Annotation {
-    return []schema.Annotation{annotation.JoinTable}
+    return []schema.Annotation{annotation.JoinTable{}}
 }
 
 func (SpeciesHabitat) Fields() []ent.Field {
@@ -187,7 +187,7 @@ package schema
 type SpeciesHabitat struct { ent.Schema }
 
 func (SpeciesHabitat) Annotations() []schema.Annotation {
-    return []schema.Annotation{annotation.JoinTable}
+    return []schema.Annotation{annotation.JoinTable{}}
 }
 
 func (SpeciesHabitat) Fields() []ent.Field {
@@ -216,13 +216,7 @@ For a safety net independent of code generation:
 
 ```go
 func TestFourNF(t *testing.T) {
-    violations, err := extension.ValidateGraph("./schema", "mymodule/ent")
-    if err != nil {
-        t.Fatal(err)
-    }
-    for _, v := range violations {
-        t.Error(v)
-    }
+    fournftest.ValidateGraph(t, "./schema", "mymodule/ent")
 }
 ```
 
@@ -231,7 +225,7 @@ func TestFourNF(t *testing.T) {
 In Ent, calling `.Field()` on an edge places a foreign key column on the schema's table. 4NF requires that multi-valued dependencies are factored into separate tables. This extension enforces that rule at two levels:
 
 1. **Entity schemas** must not have edges with `.Field()`. All foreign keys must live in dedicated join table schemas.
-2. **Join table schemas** (annotated with `annotation.JoinTable`) must have at least two foreign key edges, and every field must be a foreign key. This prevents misuse of the annotation to bypass the entity restriction.
+2. **Join table schemas** (annotated with `annotation.JoinTable{}`) must have at least two foreign key edges, and every field must be a foreign key. This prevents misuse of the annotation to bypass the entity restriction.
 
 ## License
 

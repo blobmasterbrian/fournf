@@ -1,11 +1,11 @@
-// Package extension provides an entc extension that enforces 4NF.
+// Package fournf provides an entc extension that enforces 4NF.
 //
 // Entity schemas must not have edges that use .Field() (which would place a foreign key
 // column on the entity table). Only schemas annotated with [annotation.JoinTable]
 // may do so. Wire it into your entc.go:
 //
-//	entc.Extensions(extension.FourNF{})
-package extension
+//	entc.Extensions(fournf.Extension{})
+package fournf
 
 import (
 	"fmt"
@@ -16,16 +16,14 @@ import (
 	"github.com/blobmasterbrian/fournf/annotation"
 )
 
-// FourNF is an entc.Extension that fails code generation when an entity schema
+// Extension is an entc.Extension that fails code generation when an entity schema
 // (one NOT annotated with annotation.JoinTable) contains an edge with .Field().
-var FourNF = fourNF{}
-
-type fourNF struct {
+type Extension struct {
 	entc.DefaultExtension
 }
 
 // Hooks returns the generation hooks that perform the 4NF validation.
-func (fourNF) Hooks() []gen.Hook {
+func (Extension) Hooks() []gen.Hook {
 	return []gen.Hook{validate}
 }
 
@@ -82,7 +80,7 @@ func validateJoinTable(n *gen.Type) error {
 
 func isJoinTable(n *gen.Type) bool {
 	for _, a := range n.Annotations {
-		if a == annotation.JoinTable {
+		if _, ok := a.(annotation.JoinTable); ok {
 			return true
 		}
 	}

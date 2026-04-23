@@ -1,4 +1,4 @@
-package extension
+package fournf
 
 import (
 	"fmt"
@@ -9,13 +9,6 @@ import (
 
 // ValidateGraph loads the schema graph from schemaDir and checks that no entity
 // schema has edges with .Field(). Returns a list of violations (empty = pass).
-// Use this in CI tests for a safety net independent of code generation.
-//
-//	func TestFourNF(t *testing.T) {
-//	    violations, err := extension.ValidateGraph("./schema", "mymodule/ent")
-//	    if err != nil { t.Fatal(err) }
-//	    for _, v := range violations { t.Error(v) }
-//	}
 func ValidateGraph(schemaDir, pkg string) ([]string, error) {
 	graph, err := entc.LoadGraph(schemaDir, &gen.Config{
 		Package: pkg,

@@ -2,13 +2,11 @@
 package annotation
 
 // JoinTable marks an Ent schema as a join table.
-// Schemas annotated with JoinTable are permitted to have edges with .Field()
-// (which place foreign key columns on the table). Entity schemas must NOT have such edges.
-var JoinTable = joinTable{}
-
-type joinTable struct{}
+// Annotated schemas must have at least two foreign key edges and every field
+// must be a foreign key. Entity schemas must NOT have edges with .Field().
+type JoinTable struct{}
 
 // Name implements the ent schema annotation interface.
-func (joinTable) Name() string {
+func (JoinTable) Name() string {
 	return "JoinTable"
 }
