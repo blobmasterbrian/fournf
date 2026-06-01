@@ -22,19 +22,36 @@ import (
 // schema (one NOT annotated with [JoinTable]) contains an edge with .Field().
 type Extension struct {
 	entc.DefaultExtension
+	requireTimestamps bool
+}
+
+// Option configures an [Extension].
+type Option func(*Extension)
+
+// WithTimestamps returns an [Option] that requires every entity schema to have
+// created_at and updated_at fields. Join tables are exempt, as are schemas
+// annotated with [SkipTimestamps].
+func WithTimestamps() Option {
+	return func(e *Extension) {
+		e.requireTimestamps = true
+	}
 }
 
 // NewExtension returns a new 4NF extension.
-func NewExtension() (*Extension, error) {
-	return &Extension{}, nil
+func NewExtension(opts ...Option) (*Extension, error) {
+	e := &Extension{}
+	for _, o := range opts {
+		o(e)
+	}
+	return e, nil
 }
 
 // Hooks returns the generation hooks that perform the 4NF validation.
-func (*Extension) Hooks() []gen.Hook {
-	return []gen.Hook{validate}
+func (e *Extension) Hooks() []gen.Hook {
+	return []gen.Hook{e.validate}
 }
 
-func validate(next gen.Generator) gen.Generator {
+func (e *Extension) validate(next gen.Generator) gen.Generator {
 	return gen.GenerateFunc(func(g *gen.Graph) error {
 		for _, n := range g.Nodes {
 			if isJoinTable(n) {
@@ -43,13 +60,26 @@ func validate(next gen.Generator) gen.Generator {
 				}
 				continue
 			}
-			for _, e := range n.Edges {
-				if e.Field() != nil {
+			for _, edge := range n.Edges {
+				if edge.Field() != nil {
 					return fmt.Errorf(
 						"4NF violation: entity %q has edge %q with .Field(%q); "+
 							"move this foreign key to a join table schema annotated with fournf.JoinTable()",
-						n.Name, e.Name, e.Field().Name,
+						n.Name, edge.Name, edge.Field().Name,
 					)
+				}
+			}
+		}
+		if e.requireTimestamps {
+			for _, n := range g.Nodes {
+				if isJoinTable(n) || skipTimestamps(n) {
+					continue
+				}
+				if err := checkTimestampField(n, "created_at", false); err != nil {
+					return err
+				}
+				if err := checkTimestampField(n, "updated_at", true); err != nil {
+					return err
 				}
 			}
 		}
@@ -103,4 +133,59 @@ func isJoinTable(n *gen.Type) bool {
 		}
 	}
 	return false
+}
+
+func skipTimestamps(n *gen.Type) bool {
+	// Check typed annotation.
+	for _, a := range n.Annotations {
+		if a, ok := a.(Annotation); ok && a.SkipTimestamps {
+			return true
+		}
+	}
+	// Also check the raw map representation (annotations loaded from schema).
+	if m, ok := n.Annotations["FourNF"]; ok && m != nil {
+		if raw, ok := m.(map[string]interface{}); ok {
+			if v, ok := raw["skip_timestamps"]; ok {
+				if b, ok := v.(bool); ok && b {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// checkTimestampField returns an error if the field is missing, has no Default,
+// or (when needUpdateDefault is true) has no UpdateDefault.
+func checkTimestampField(n *gen.Type, name string, needUpdateDefault bool) error {
+	f := findField(n, name)
+	if f == nil {
+		return fmt.Errorf(
+			"timestamp violation: entity %q is missing required field %q; "+
+				"add it or annotate the schema with fournf.SkipTimestamps()",
+			n.Name, name,
+		)
+	}
+	if !f.Default {
+		return fmt.Errorf(
+			"timestamp violation: entity %q field %q must have a Default value",
+			n.Name, name,
+		)
+	}
+	if needUpdateDefault && !f.UpdateDefault {
+		return fmt.Errorf(
+			"timestamp violation: entity %q field %q must have an UpdateDefault value",
+			n.Name, name,
+		)
+	}
+	return nil
+}
+
+func findField(n *gen.Type, name string) *gen.Field {
+	for _, f := range n.Fields {
+		if f.Name == name {
+			return f
+		}
+	}
+	return nil
 }

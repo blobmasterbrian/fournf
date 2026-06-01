@@ -7,9 +7,30 @@ import (
 	"entgo.io/ent/entc/gen"
 )
 
+// ValidateOption configures [ValidateGraph].
+type ValidateOption func(*validateConfig)
+
+type validateConfig struct {
+	requireTimestamps bool
+}
+
+// WithTimestampValidation returns a [ValidateOption] that checks every entity
+// schema for created_at and updated_at fields. Join tables and schemas
+// annotated with [SkipTimestamps] are exempt.
+func WithTimestampValidation() ValidateOption {
+	return func(c *validateConfig) {
+		c.requireTimestamps = true
+	}
+}
+
 // ValidateGraph loads the schema graph from schemaDir and checks that no entity
 // schema has edges with .Field(). Returns a list of violations (empty = pass).
-func ValidateGraph(schemaDir, pkg string) ([]string, error) {
+func ValidateGraph(schemaDir, pkg string, opts ...ValidateOption) ([]string, error) {
+	var cfg validateConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	graph, err := entc.LoadGraph(schemaDir, &gen.Config{
 		Package: pkg,
 	})
@@ -32,6 +53,17 @@ func ValidateGraph(schemaDir, pkg string) ([]string, error) {
 			}
 		}
 	}
+
+	if cfg.requireTimestamps {
+		for _, n := range graph.Nodes {
+			if isJoinTable(n) || skipTimestamps(n) {
+				continue
+			}
+			violations = append(violations, checkTimestampFieldGraph(n, "created_at", false)...)
+			violations = append(violations, checkTimestampFieldGraph(n, "updated_at", true)...)
+		}
+	}
+
 	return violations, nil
 }
 
@@ -56,6 +88,31 @@ func validateJoinTableGraph(n *gen.Type) []string {
 				n.Name, f.Name,
 			))
 		}
+	}
+	return violations
+}
+
+func checkTimestampFieldGraph(n *gen.Type, name string, needUpdateDefault bool) []string {
+	var violations []string
+	f := findField(n, name)
+	if f == nil {
+		violations = append(violations, fmt.Sprintf(
+			"entity %q is missing required field %q",
+			n.Name, name,
+		))
+		return violations
+	}
+	if !f.Default {
+		violations = append(violations, fmt.Sprintf(
+			"entity %q field %q must have a Default value",
+			n.Name, name,
+		))
+	}
+	if needUpdateDefault && !f.UpdateDefault {
+		violations = append(violations, fmt.Sprintf(
+			"entity %q field %q must have an UpdateDefault value",
+			n.Name, name,
+		))
 	}
 	return violations
 }

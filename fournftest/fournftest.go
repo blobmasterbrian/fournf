@@ -14,9 +14,9 @@ import (
 //	func TestFourNF(t *testing.T) {
 //	    fournftest.ValidateGraph(t, "./schema", "mymodule/ent")
 //	}
-func ValidateGraph(tb testing.TB, schemaDir, pkg string) {
+func ValidateGraph(tb testing.TB, schemaDir, pkg string, opts ...fournf.ValidateOption) {
 	tb.Helper()
-	violations, err := fournf.ValidateGraph(schemaDir, pkg)
+	violations, err := fournf.ValidateGraph(schemaDir, pkg, opts...)
 	if err != nil {
 		tb.Fatalf("loading schema graph: %v", err)
 	}
