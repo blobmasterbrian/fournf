@@ -25,20 +25,20 @@ type Extension struct {
 	requireTimestamps bool
 }
 
-// Option configures an [Extension].
-type Option func(*Extension)
+// ExtensionOption configures an [Extension].
+type ExtensionOption func(*Extension)
 
-// WithTimestamps returns an [Option] that requires every entity schema to have
+// WithTimestamps returns an [ExtensionOption] that requires every entity schema to have
 // created_at and updated_at fields. Join tables are exempt, as are schemas
 // annotated with [SkipTimestamps].
-func WithTimestamps() Option {
+func WithTimestamps() ExtensionOption {
 	return func(e *Extension) {
 		e.requireTimestamps = true
 	}
 }
 
 // NewExtension returns a new 4NF extension.
-func NewExtension(opts ...Option) (*Extension, error) {
+func NewExtension(opts ...ExtensionOption) (*Extension, error) {
 	e := &Extension{}
 	for _, o := range opts {
 		o(e)
