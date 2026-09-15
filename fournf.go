@@ -26,7 +26,7 @@ import (
 type Extension struct {
 	entc.DefaultExtension
 	requireTimestamps bool
-	classDiagramPath  string
+	classDiagramPaths []string
 }
 
 // ExtensionOption configures an [Extension].
@@ -42,16 +42,26 @@ func WithTimestamps() ExtensionOption {
 }
 
 // WithClassDiagram returns an [ExtensionOption] that writes a Mermaid class
-// diagram of the schema to path after each successful code generation.
+// diagram of the schema to each path after each successful code generation.
 //
 // The diagram shows the domain rather than the storage: each join table
 // collapses into a single association between the two entities it connects,
 // labelled with the join's name, and its multiplicity is read from the join's
-// unique indexes. A relative path resolves against the directory code
-// generation runs in, and missing parent directories are created.
-func WithClassDiagram(path string) ExtensionOption {
+// unique indexes.
+//
+// Each path's file extension selects its format. A ".md" path is written as
+// Markdown with the diagram inside a fenced block, which GitHub renders
+// inline; any other extension is written as plain Mermaid, which is what
+// Mermaid tooling reads. Passing one of each gives a document to browse and a
+// file to render:
+//
+//	fournf.WithClassDiagram("schema.mmd", "schema.md")
+//
+// A relative path resolves against the directory code generation runs in, and
+// missing parent directories are created.
+func WithClassDiagram(path string, more ...string) ExtensionOption {
 	return func(e *Extension) {
-		e.classDiagramPath = path
+		e.classDiagramPaths = append([]string{path}, more...)
 	}
 }
 
@@ -69,7 +79,7 @@ func NewExtension(opts ...ExtensionOption) (*Extension, error) {
 // ever written for a schema that satisfies 4NF.
 func (e *Extension) Hooks() []gen.Hook {
 	hooks := []gen.Hook{e.validate}
-	if e.classDiagramPath != "" {
+	if len(e.classDiagramPaths) > 0 {
 		hooks = append(hooks, e.classDiagram)
 	}
 	return hooks

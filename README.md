@@ -228,13 +228,15 @@ func TestFourNF(t *testing.T) {
 
 ## Class diagram
 
-`WithClassDiagram(path)` writes a [Mermaid](https://mermaid.js.org) class diagram after each successful code generation. GitHub renders Mermaid natively, so the file can be embedded in any markdown document with no toolchain.
+`WithClassDiagram(path, ...)` writes a [Mermaid](https://mermaid.js.org) class diagram after each successful code generation.
 
 ```go
 ext, err := fournf.NewExtension(
-    fournf.WithClassDiagram("schema.mmd"),
+    fournf.WithClassDiagram("schema.mmd", "schema.md"),
 )
 ```
+
+Each path's extension selects its format. A `.md` path is written as Markdown with the diagram inside a fenced block, which GitHub renders inline; any other extension is written as plain Mermaid, which is what Mermaid tooling reads. Pass one of each to get both, as above.
 
 A relative path resolves against the directory code generation runs in, and missing parent directories are created. The diagram is only written for a schema that passes 4NF validation.
 
