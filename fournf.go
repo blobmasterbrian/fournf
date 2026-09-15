@@ -2,6 +2,9 @@
 //
 // Entity schemas must not have edges that use .Field() (which would place a foreign key
 // column on the entity table). Only schemas annotated with [JoinTable] may do so.
+//
+// Because the extension knows which schemas are join tables, it can also draw the
+// schema as a domain diagram: see [WithClassDiagram].
 // Wire it into your entc.go:
 //
 //	ext, err := fournf.NewExtension()
@@ -23,6 +26,7 @@ import (
 type Extension struct {
 	entc.DefaultExtension
 	requireTimestamps bool
+	classDiagramPath  string
 }
 
 // ExtensionOption configures an [Extension].
@@ -37,6 +41,20 @@ func WithTimestamps() ExtensionOption {
 	}
 }
 
+// WithClassDiagram returns an [ExtensionOption] that writes a Mermaid class
+// diagram of the schema to path after each successful code generation.
+//
+// The diagram shows the domain rather than the storage: each join table
+// collapses into a single association between the two entities it connects,
+// labelled with the join's name, and its multiplicity is read from the join's
+// unique indexes. A relative path resolves against the directory code
+// generation runs in, and missing parent directories are created.
+func WithClassDiagram(path string) ExtensionOption {
+	return func(e *Extension) {
+		e.classDiagramPath = path
+	}
+}
+
 // NewExtension returns a new 4NF extension.
 func NewExtension(opts ...ExtensionOption) (*Extension, error) {
 	e := &Extension{}
@@ -46,9 +64,15 @@ func NewExtension(opts ...ExtensionOption) (*Extension, error) {
 	return e, nil
 }
 
-// Hooks returns the generation hooks that perform the 4NF validation.
+// Hooks returns the 4NF validation hook, followed by the class diagram hook
+// when [WithClassDiagram] is set. Validation runs first, so a diagram is only
+// ever written for a schema that satisfies 4NF.
 func (e *Extension) Hooks() []gen.Hook {
-	return []gen.Hook{e.validate}
+	hooks := []gen.Hook{e.validate}
+	if e.classDiagramPath != "" {
+		hooks = append(hooks, e.classDiagram)
+	}
+	return hooks
 }
 
 func (e *Extension) validate(next gen.Generator) gen.Generator {
